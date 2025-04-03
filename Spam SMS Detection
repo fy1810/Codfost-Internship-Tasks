@@ -1,0 +1,269 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyMbkT9KN2y8AYF66EZLIrtt"
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "hD-yRAJHNe3f"
+      },
+      "outputs": [],
+      "source": [
+        "import kagglehub\n",
+        "import pandas as pd\n",
+        "import numpy as np\n",
+        "import re\n",
+        "import string\n",
+        "\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.feature_extraction.text import TfidfVectorizer\n",
+        "from sklearn.naive_bayes import MultinomialNB\n",
+        "from sklearn.svm import SVC\n",
+        "from sklearn.linear_model import LogisticRegression\n",
+        "from sklearn.metrics import accuracy_score, classification_report, confusion_matrix\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Download latest version\n",
+        "path = kagglehub.dataset_download(\"uciml/sms-spam-collection-dataset\")\n",
+        "\n",
+        "# Load the dataset\n",
+        "df = pd.read_csv(f\"{path}/spam.csv\", encoding=\"latin-1\")\n",
+        "\n",
+        "# Rename columns for simplicity\n",
+        "df = df.iloc[:, [0, 1]]\n",
+        "df.columns = [\"label\", \"message\"]\n",
+        "\n",
+        "# Convert labels to binary format\n",
+        "df[\"label\"] = df[\"label\"].map({\"ham\": 0, \"spam\": 1})\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "rnxFZtixNk7M",
+        "outputId": "90bdbec9-1e63-419c-8324-a5cab3d6233d"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Downloading from https://www.kaggle.com/api/v1/datasets/download/uciml/sms-spam-collection-dataset?dataset_version_number=1...\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "100%|██████████| 211k/211k [00:00<00:00, 47.7MB/s]"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Extracting files...\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def preprocess_text(text):\n",
+        "    text = text.lower()  # Convert to lowercase\n",
+        "    text = re.sub(r'\\d+', '', text)  # Remove numbers\n",
+        "    text = text.translate(str.maketrans('', '', string.punctuation))  # Remove punctuation\n",
+        "    text = text.strip()  # Remove leading/trailing spaces\n",
+        "    return text\n",
+        "\n",
+        "df[\"message\"] = df[\"message\"].apply(preprocess_text)\n"
+      ],
+      "metadata": {
+        "id": "A4P-LLsWNoid"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Split data\n",
+        "X_train, X_test, y_train, y_test = train_test_split(df[\"message\"], df[\"label\"], test_size=0.2, random_state=42)\n",
+        "\n",
+        "# Apply TF-IDF Vectorization\n",
+        "tfidf = TfidfVectorizer(stop_words=\"english\", max_features=5000)\n",
+        "X_train_tfidf = tfidf.fit_transform(X_train)\n",
+        "X_test_tfidf = tfidf.transform(X_test)\n"
+      ],
+      "metadata": {
+        "id": "CGQObDKqNrUH"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "nb_model = MultinomialNB()\n",
+        "nb_model.fit(X_train_tfidf, y_train)\n",
+        "y_pred_nb = nb_model.predict(X_test_tfidf)\n",
+        "\n",
+        "print(\"Naïve Bayes Performance:\")\n",
+        "print(classification_report(y_test, y_pred_nb))\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "LWYDdnDeNyWL",
+        "outputId": "bbd64e36-5302-4550-bb79-19d9ae348d8c"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Naïve Bayes Performance:\n",
+            "              precision    recall  f1-score   support\n",
+            "\n",
+            "           0       0.97      1.00      0.98       965\n",
+            "           1       1.00      0.79      0.88       150\n",
+            "\n",
+            "    accuracy                           0.97      1115\n",
+            "   macro avg       0.98      0.89      0.93      1115\n",
+            "weighted avg       0.97      0.97      0.97      1115\n",
+            "\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "svm_model = SVC(kernel=\"linear\")\n",
+        "svm_model.fit(X_train_tfidf, y_train)\n",
+        "y_pred_svm = svm_model.predict(X_test_tfidf)\n",
+        "\n",
+        "print(\"SVM Performance:\")\n",
+        "print(classification_report(y_test, y_pred_svm))\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "go7evrG6Nz4i",
+        "outputId": "677df4af-c1b1-4ab9-af23-16e0336300b1"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "SVM Performance:\n",
+            "              precision    recall  f1-score   support\n",
+            "\n",
+            "           0       0.98      1.00      0.99       965\n",
+            "           1       0.99      0.88      0.93       150\n",
+            "\n",
+            "    accuracy                           0.98      1115\n",
+            "   macro avg       0.98      0.94      0.96      1115\n",
+            "weighted avg       0.98      0.98      0.98      1115\n",
+            "\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "lr_model = LogisticRegression()\n",
+        "lr_model.fit(X_train_tfidf, y_train)\n",
+        "y_pred_lr = lr_model.predict(X_test_tfidf)\n",
+        "\n",
+        "print(\"Logistic Regression Performance:\")\n",
+        "print(classification_report(y_test, y_pred_lr))\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "_QDSH4JlN5RI",
+        "outputId": "3e283f6e-3c1b-4b74-97ad-746b97005702"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Logistic Regression Performance:\n",
+            "              precision    recall  f1-score   support\n",
+            "\n",
+            "           0       0.95      1.00      0.98       965\n",
+            "           1       0.98      0.69      0.81       150\n",
+            "\n",
+            "    accuracy                           0.96      1115\n",
+            "   macro avg       0.97      0.84      0.89      1115\n",
+            "weighted avg       0.96      0.96      0.95      1115\n",
+            "\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(f\"Naïve Bayes Accuracy: {accuracy_score(y_test, y_pred_nb):.2f}\")\n",
+        "print(f\"SVM Accuracy: {accuracy_score(y_test, y_pred_svm):.2f}\")\n",
+        "print(f\"Logistic Regression Accuracy: {accuracy_score(y_test, y_pred_lr):.2f}\")\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "eYKpqU6FN8TA",
+        "outputId": "a7635836-ec88-4629-a7e2-7530b8fb40dc"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Naïve Bayes Accuracy: 0.97\n",
+            "SVM Accuracy: 0.98\n",
+            "Logistic Regression Accuracy: 0.96\n"
+          ]
+        }
+      ]
+    }
+  ]
+}
